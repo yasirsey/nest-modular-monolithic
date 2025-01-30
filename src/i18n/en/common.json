@@ -1,0 +1,14 @@
+{
+    "WELCOME": "Welcome",
+    "HELLO": "Hello {name}",
+    "ERRORS": {
+      "NOT_FOUND": "Resource not found",
+      "UNAUTHORIZED": "Unauthorized access",
+      "VALIDATION": {
+        "REQUIRED": "{field} is required",
+        "MIN_LENGTH": "{field} must be at least {min} characters",
+        "MAX_LENGTH": "{field} must not exceed {max} characters",
+        "EMAIL": "Invalid email format"
+      }
+    }
+  }

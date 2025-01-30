@@ -1,0 +1,14 @@
+{
+    "WELCOME": "Hoş Geldiniz",
+    "HELLO": "Merhaba {name}",
+    "ERRORS": {
+      "NOT_FOUND": "Kaynak bulunamadı",
+      "UNAUTHORIZED": "Yetkisiz erişim",
+      "VALIDATION": {
+        "REQUIRED": "{field} zorunludur",
+        "MIN_LENGTH": "{field} en az {min} karakter olmalıdır",
+        "MAX_LENGTH": "{field} en fazla {max} karakter olmalıdır",
+        "EMAIL": "Geçersiz e-posta formatı"
+      }
+    }
+  }
