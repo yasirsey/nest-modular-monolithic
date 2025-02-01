@@ -1,10 +1,10 @@
 import { Body, Controller, Post, UseGuards } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { RolesGuard } from "./guards/roles.guard";
 import { AdminService } from "./admin.service";
-import { Roles } from "./decorators/roles.decorator";
 import { CreateAdminDto } from "./dto/create-admin.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
 
 // src/modules/admin/admin.controller.ts
 @Controller('admin')

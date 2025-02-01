@@ -4,8 +4,8 @@ import { User, UserSchema } from "../users/schemas/user.schema";
 import { Role, RoleSchema } from "../auth/schemas/role.schema";
 import { Permission, PermissionSchema } from "../auth/schemas/permission.schema";
 import { AdminService } from "./admin.service";
-import { RolesGuard } from "./guards/roles.guard";
 import { AdminController } from "./admin.controller";
+import { RolesGuard } from "../auth/guards/roles.guard";
 
 // src/modules/admin/admin.module.ts
 @Module({
