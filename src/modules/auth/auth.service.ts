@@ -1,11 +1,15 @@
-// src/modules/auth/auth.service.ts
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { I18nService } from 'nestjs-i18n';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
-import { RegisterDto } from './dto/register.dto';
+
+import { RegisterRequestDto } from './dto/request/register.request.dto';
+import { AuthResponseDto } from './dto/response/auth.response.dto';
+import { SessionResponseDto } from './dto/response/session.response.dto';
+import { LogoutResponseDto } from './dto/response/logout.response.dto';
+import { UserDto } from '../users/dto/response/user.dto';
 
 @Injectable()
 export class AuthService {
@@ -18,121 +22,105 @@ export class AuthService {
 
     async validateUser(email: string, password: string): Promise<any> {
         const user = await this.usersService.findByEmail(email);
-
-        if (user && user.password && await bcrypt.compare(password, user.password)) {
+        if (user && user.password && (await bcrypt.compare(password, user.password))) {
             return user;
         }
         return null;
     }
 
-    async session(userId: string): Promise<any> {
-        return await this.usersService.findById(userId);
+    async session(userId: string): Promise<SessionResponseDto> {
+        const user = await this.usersService.findById(userId);
+        return {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            roles: user.roles.map(role => role.name),
+            permissions: user.permissions?.map(permission => permission.name),
+            isEmailVerified: user.isEmailVerified,
+            lastLoginAt: user.lastLoginAt,
+        };
     }
 
-    async login(user: any) {
-        // Ensure required fields exist in the payload
+    async login(user: any): Promise<AuthResponseDto> {
         const payload = {
             email: user.email,
-            sub: user._id.toString(),
-            roles: user.roles || ['user'],
+            sub: user.id || user._id.toString(),
+            roles: user.roles?.map(role => role.name) || ['user'],
         };
 
         const [accessToken, refreshToken] = await Promise.all([
-            this.jwtService.signAsync(
-                payload,
-                {
-                    secret: this.configService.get<string>('jwt.secret'),
-                    expiresIn: this.configService.get<string>('jwt.accessExpiration', '15m'),
-                }
-            ),
-            this.jwtService.signAsync(
-                payload,
-                {
-                    secret: this.configService.get<string>('jwt.secret'),
-                    expiresIn: this.configService.get<string>('jwt.refreshExpiration', '7d'),
-                }
-            ),
+            this.jwtService.signAsync(payload, {
+                secret: this.configService.get<string>('jwt.secret'),
+                expiresIn: this.configService.get<string>('jwt.accessExpiration', '15m'),
+            }),
+            this.jwtService.signAsync(payload, {
+                secret: this.configService.get<string>('jwt.secret'),
+                expiresIn: this.configService.get<string>('jwt.refreshExpiration', '7d'),
+            }),
         ]);
 
-        // Ensure we use the correct ID format when updating refresh token
-        const userId = user._id.toString()
+        const userId = user.id || user._id.toString();
         await this.usersService.updateRefreshToken(userId, refreshToken);
 
-        // Return both tokens and user info
+        const userDto: UserDto = {
+            id: userId,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            roles: user.roles?.map(role => role.name) || ['user'],
+            isEmailVerified: user.isEmailVerified || false,
+        };
+
         return {
             access_token: accessToken,
             refresh_token: refreshToken,
-            user: {
-                id: userId,
-                email: user.email,
-                roles: user.roles || ['user'],
-                firstName: user.firstName,
-                lastName: user.lastName,
-            }
+            user: userDto,
         };
     }
 
-    async register(registerDto: RegisterDto) {
-        // Check if user exists
+    async register(registerDto: RegisterRequestDto): Promise<AuthResponseDto> {
         const existingUser = await this.usersService.findByEmail(registerDto.email);
         if (existingUser) {
             throw new ConflictException(
-                await this.i18nService.translate('auth.EMAIL_ALDREADY_EXIST')
+                await this.i18nService.translate('auth.EMAIL_ALREADY_EXISTS'),
             );
         }
 
-        // Hash password
         const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-        // Create user with default role and local provider
         const user = await this.usersService.create({
             ...registerDto,
             password: hashedPassword,
             provider: 'local',
         });
 
-        // Generate tokens
         return this.login(user);
     }
 
-    async refreshToken(userId: string, refreshToken: string) {
+    async refreshToken(userId: string, refreshToken: string): Promise<AuthResponseDto> {
         const user = await this.usersService.findById(userId);
         if (!user || !user.refreshToken) {
             throw new UnauthorizedException(
-                await this.i18nService.translate('auth.invalidRefreshToken')
+                await this.i18nService.translate('auth.INVALID_REFRESH_TOKEN'),
             );
         }
 
         const isRefreshTokenValid = await bcrypt.compare(
             refreshToken,
-            user.refreshToken
+            user.refreshToken,
         );
 
         if (!isRefreshTokenValid) {
             throw new UnauthorizedException(
-                await this.i18nService.translate('auth.invalidRefreshToken')
+                await this.i18nService.translate('auth.INVALID_REFRESH_TOKEN'),
             );
         }
 
-        const payload = { email: user.email, sub: user.id };
-        const [newAccessToken, newRefreshToken] = await Promise.all([
-            this.jwtService.signAsync(payload, {
-                expiresIn: this.configService.get('jwt.accessExpiration'),
-            }),
-            this.jwtService.signAsync(payload, {
-                expiresIn: this.configService.get('jwt.refreshExpiration'),
-            }),
-        ]);
-
-        await this.usersService.updateRefreshToken(user.id, newRefreshToken);
-
-        return {
-            access_token: newAccessToken,
-            refresh_token: newRefreshToken,
-        };
+        return this.login(user);
     }
 
-    async validateOAuthUser(profile: any, provider: string) {
+    async validateOAuthUser(profile: any, provider: string): Promise<any> {
         const email = profile.emails[0].value;
         let user = await this.usersService.findByEmail(email);
 
@@ -149,9 +137,8 @@ export class AuthService {
         return user;
     }
 
-    async logout(userId: string) {
+    async logout(userId: string): Promise<LogoutResponseDto> {
         await this.usersService.updateRefreshToken(userId, null);
         return { success: true };
     }
 }
-

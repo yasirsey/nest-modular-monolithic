@@ -2,7 +2,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AdminModule } from "./modules/admin/admin.module";
 import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { CustomLogger } from "./common/logger/logger.service";
-import { Module } from "@nestjs/common";
+import { ClassSerializerInterceptor, Module } from "@nestjs/common";
 import configuration from "./config/configuration";
 import { MongooseModule } from "@nestjs/mongoose";
 import { SeedModule } from "./modules/seed/seed.module";
@@ -46,6 +46,10 @@ import * as path from "path";
   ],
   controllers: [],
   providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor
+    },
     {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
