@@ -3,6 +3,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ForbiddenErrorDto, InternalServerErrorDto, NotFoundErrorDto, UnauthorizedErrorDto, ValidationErrorDto } from './common/dto';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -34,13 +35,24 @@ async function bootstrap() {
     .addTag('Admin', 'Administrator endpoints')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-    customSiteTitle: configService.get<string>('app.name', 'API Documentation')
-  });
+    const document = SwaggerModule.createDocument(app, config, {
+      extraModels: [
+        ValidationErrorDto,
+        UnauthorizedErrorDto,
+        ForbiddenErrorDto,
+        NotFoundErrorDto,
+        InternalServerErrorDto
+      ],
+    });
+    
+    SwaggerModule.setup('api', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        docExpansion: 'none',
+      },
+      customSiteTitle: configService.get<string>('app.name', 'API Documentation')
+    });
 
   // CORS configuration
   const corsEnabled = configService.get<boolean>('cors.enabled', false);

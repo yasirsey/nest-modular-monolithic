@@ -3,7 +3,10 @@ import { Document, Types } from 'mongoose';
 import { Role } from 'src/modules/auth/schemas/role.schema';
 import { Permission } from 'src/modules/auth/schemas/permission.schema';
 
-export type UserDocument = User & Document;
+export type UserDocument = User & Document & {
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 @Schema({
   timestamps: true,

@@ -1,11 +1,12 @@
 // src/modules/auth/dto/response/session.response.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
-import { UserDto } from 'src/modules/users/dto/response/user.dto';
+import { ApiProperty, OmitType } from '@nestjs/swagger';
+import { UserDto } from '../../../users/dto/response/user.dto';
+import { Permission } from '../../schemas/permission.schema';
 
-export class SessionResponseDto extends UserDto {
-  @ApiProperty({ type: [String] })
-  permissions?: string[];
+export class SessionResponseDto extends OmitType(UserDto, ['refreshToken'] as const) {
+  @ApiProperty({ type: [Permission], example: ['users.read', 'users.write'] })
+  permissions: Permission[];
 
-  @ApiProperty()
-  lastLoginAt?: Date;
+  @ApiProperty({ example: '2024-02-01T12:00:00.000Z' })
+  lastLoginAt: Date;
 }

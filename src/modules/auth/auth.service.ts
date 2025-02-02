@@ -35,10 +35,12 @@ export class AuthService {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            roles: user.roles.map(role => role.name),
-            permissions: user.permissions?.map(permission => permission.name),
+            roles: user.roles,
+            permissions: user.permissions,
             isEmailVerified: user.isEmailVerified,
             lastLoginAt: user.lastLoginAt,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
         };
     }
 
@@ -46,9 +48,9 @@ export class AuthService {
         const payload = {
             email: user.email,
             sub: user.id || user._id.toString(),
-            roles: user.roles?.map(role => role.name) || ['user'],
+            roles: user.roles,
         };
-
+    
         const [accessToken, refreshToken] = await Promise.all([
             this.jwtService.signAsync(payload, {
                 secret: this.configService.get<string>('jwt.secret'),
@@ -59,19 +61,24 @@ export class AuthService {
                 expiresIn: this.configService.get<string>('jwt.refreshExpiration', '7d'),
             }),
         ]);
-
+    
         const userId = user.id || user._id.toString();
         await this.usersService.updateRefreshToken(userId, refreshToken);
-
+    
         const userDto: UserDto = {
             id: userId,
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            roles: user.roles?.map(role => role.name) || ['user'],
+            roles: user.roles,
+            permissions: user.permissions,
             isEmailVerified: user.isEmailVerified || false,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            provider: user.provider,
+            lastLoginAt: user.lastLoginAt
         };
-
+    
         return {
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -121,20 +128,21 @@ export class AuthService {
     }
 
     async validateOAuthUser(profile: any, provider: string): Promise<any> {
-        const email = profile.emails[0].value;
-        let user = await this.usersService.findByEmail(email);
-
-        if (!user) {
-            user = await this.usersService.create({
-                email,
-                provider,
-                providerId: profile.id,
-                firstName: profile.name?.givenName,
-                lastName: profile.name?.familyName,
-            });
-        }
-
-        return user;
+        // const email = profile.emails[0].value;
+        // let user = await this.usersService.findByEmail(email);
+    
+        // if (!user) {
+        //     const createUserDto: CreateUserDto = {
+        //         email,
+        //         firstName: profile.name?.givenName,
+        //         lastName: profile.name?.familyName,
+        //         provider,
+        //         providerId: profile.id,
+        //     };
+        //     user = await this.usersService.create(createUserDto);
+        // }
+    
+        // return user;
     }
 
     async logout(userId: string): Promise<LogoutResponseDto> {

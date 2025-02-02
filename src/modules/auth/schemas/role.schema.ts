@@ -1,10 +1,24 @@
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-
 // src/modules/auth/schemas/role.schema.ts
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document, Types } from "mongoose";
 
-export type RoleDocument = Role & Document;
+export type RoleDocument = Role & Document<Types.ObjectId> & {
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-@Schema({ timestamps: true })
+@Schema({ 
+  timestamps: true,
+  toJSON: { 
+    virtuals: true,
+    transform: (_, ret) => {
+      ret.id = ret._id?.toString();
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    }
+  }
+})
 export class Role {
   @Prop({ required: true, unique: true })
   name: string;
@@ -17,5 +31,3 @@ export class Role {
 }
 
 export const RoleSchema = SchemaFactory.createForClass(Role);
-RoleSchema.set('toObject', { virtuals: true });
-RoleSchema.set('toJSON', { virtuals: true });

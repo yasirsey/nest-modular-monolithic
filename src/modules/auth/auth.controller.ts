@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { GetUser } from './decorators/get-user.decorator';
@@ -17,7 +17,7 @@ import { RefreshTokenRequestDto } from './dto/request/refresh-token.request.dto'
 import { AuthResponseDto } from './dto/response/auth.response.dto';
 import { SessionResponseDto } from './dto/response/session.response.dto';
 import { LogoutResponseDto } from './dto/response/logout.response.dto';
-import { ApiResponseType } from 'src/common/decorators/api-response.decorator';
+import { ApiCommonResponse } from 'src/common/decorators/api-common-response.decorator';
 
 @Controller('auth')
 @ApiTags('Authentication')
@@ -30,9 +30,11 @@ export class AuthController {
     @Post('register')
     @Public()
     @ApiOperation({ summary: 'Register a new user' })
-    @ApiResponseType(AuthResponseDto)
-    @ApiResponse({ status: 201, description: 'User successfully registered', type: AuthResponseDto })
-    @ApiResponse({ status: 400, description: 'Bad Request' })
+    @ApiCommonResponse(AuthResponseDto, {
+        status: 201,
+        description: 'User successfully registered',
+        excludeStatuses: [401] // Public endpoint
+    })
     async register(@Body() registerDto: RegisterRequestDto): Promise<AuthResponseDto> {
         return this.authService.register(registerDto);
     }
@@ -40,10 +42,12 @@ export class AuthController {
     @Post('login')
     @Public()
     @UseGuards(LocalAuthGuard)
-    @ApiResponseType(AuthResponseDto)
     @ApiOperation({ summary: 'Login with email and password' })
-    @ApiResponse({ status: 200, description: 'User successfully logged in', type: AuthResponseDto })
-    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiCommonResponse(AuthResponseDto, {
+        status: 200,
+        description: 'User successfully logged in',
+        excludeStatuses: [401] // Public endpoint but uses LocalAuthGuard
+    })
     async login(@Body() loginDto: LoginRequestDto, @Request() req): Promise<AuthResponseDto> {
         return this.authService.login(req.user);
     }
@@ -52,9 +56,10 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Refresh access token' })
-    @ApiResponseType(AuthResponseDto)
-    @ApiResponse({ status: 200, description: 'Tokens successfully refreshed', type: AuthResponseDto })
-    @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+    @ApiCommonResponse(AuthResponseDto, {
+        status: 200,
+        description: 'Tokens successfully refreshed'
+    })
     async refreshToken(
         @Body() refreshTokenDto: RefreshTokenRequestDto,
         @GetUser('id') userId: string,
@@ -65,9 +70,11 @@ export class AuthController {
     @Get('session')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
-    @ApiResponseType(SessionResponseDto)
     @ApiOperation({ summary: 'Get current user session' })
-    @ApiResponse({ status: 200, description: 'Session retrieved successfully', type: SessionResponseDto })
+    @ApiCommonResponse(SessionResponseDto, {
+        status: 200,
+        description: 'Session retrieved successfully'
+    })
     async session(@GetUser('id') userId: string): Promise<SessionResponseDto> {
         return this.authService.session(userId);
     }
@@ -76,57 +83,89 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Logout user' })
-    @ApiResponseType(LogoutResponseDto)
-    @ApiResponse({ status: 200, description: 'User successfully logged out', type: LogoutResponseDto })
+    @ApiCommonResponse(LogoutResponseDto, {
+        status: 200,
+        description: 'User successfully logged out'
+    })
     async logout(@GetUser('id') userId: string): Promise<LogoutResponseDto> {
         return this.authService.logout(userId);
     }
 
     // OAuth Routes
     @Get('google')
+    @Public()
     @UseGuards(GoogleAuthGuard)
     @ApiOperation({ summary: 'Login with Google' })
-    @ApiResponse({ status: 200, description: 'Redirects to Google login' })
+    @ApiCommonResponse(null, {
+        status: 200,
+        description: 'Redirects to Google login',
+        excludeStatuses: [401] // Public endpoint
+    })
     async googleAuth() {
         // Google OAuth
     }
 
     @Get('google/callback')
+    @Public()
     @UseGuards(GoogleAuthGuard)
     @ApiOperation({ summary: 'Google OAuth callback' })
-    @ApiResponse({ status: 200, description: 'Google login successful', type: AuthResponseDto })
+    @ApiCommonResponse(AuthResponseDto, {
+        status: 200,
+        description: 'Google login successful',
+        excludeStatuses: [401] // Public endpoint with OAuth guard
+    })
     async googleAuthCallback(@Request() req): Promise<AuthResponseDto> {
         return this.authService.login(req.user);
     }
 
     @Get('facebook')
+    @Public()
     @UseGuards(FacebookAuthGuard)
     @ApiOperation({ summary: 'Login with Facebook' })
-    @ApiResponse({ status: 200, description: 'Redirects to Facebook login' })
+    @ApiCommonResponse(null, {
+        status: 200,
+        description: 'Redirects to Facebook login',
+        excludeStatuses: [401] // Public endpoint
+    })
     async facebookAuth() {
         // Facebook OAuth
     }
 
     @Get('facebook/callback')
+    @Public()
     @UseGuards(FacebookAuthGuard)
     @ApiOperation({ summary: 'Facebook OAuth callback' })
-    @ApiResponse({ status: 200, description: 'Facebook login successful', type: AuthResponseDto })
+    @ApiCommonResponse(AuthResponseDto, {
+        status: 200,
+        description: 'Facebook login successful',
+        excludeStatuses: [401] // Public endpoint with OAuth guard
+    })
     async facebookAuthCallback(@Request() req): Promise<AuthResponseDto> {
         return this.authService.login(req.user);
     }
 
     @Get('apple')
+    @Public()
     @UseGuards(AppleAuthGuard)
     @ApiOperation({ summary: 'Login with Apple' })
-    @ApiResponse({ status: 200, description: 'Redirects to Apple login' })
+    @ApiCommonResponse(null, {
+        status: 200,
+        description: 'Redirects to Apple login',
+        excludeStatuses: [401] // Public endpoint
+    })
     async appleAuth() {
         // Apple OAuth
     }
 
     @Get('apple/callback')
+    @Public()
     @UseGuards(AppleAuthGuard)
     @ApiOperation({ summary: 'Apple OAuth callback' })
-    @ApiResponse({ status: 200, description: 'Apple login successful', type: AuthResponseDto })
+    @ApiCommonResponse(AuthResponseDto, {
+        status: 200,
+        description: 'Apple login successful',
+        excludeStatuses: [401] // Public endpoint with OAuth guard
+    })
     async appleAuthCallback(@Request() req): Promise<AuthResponseDto> {
         return this.authService.login(req.user);
     }

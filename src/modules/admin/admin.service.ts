@@ -1,14 +1,15 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+// src/modules/admin/admin.service.ts
+import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Permission, PermissionDocument } from "../auth/schemas/permission.schema";
 import { Role, RoleDocument } from "../auth/schemas/role.schema";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import { Model } from "mongoose";
 import { I18nService } from "nestjs-i18n";
-import { CreateAdminDto } from "./dto/create-admin.dto";
+import { CreateAdminDto } from "./dto";
+import { UserDto } from "../users/dto";
 import * as bcrypt from 'bcrypt';
 
-// src/modules/admin/admin.service.ts
 @Injectable()
 export class AdminService {
   constructor(
@@ -18,14 +19,48 @@ export class AdminService {
     private i18nService: I18nService,
   ) {}
 
-  async createAdmin(createAdminDto: CreateAdminDto) {
+  private mapUserToDto(user: UserDocument): UserDto {
+    return {
+      id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles?.map(role => typeof role === 'string' ? role : role.name),
+      isEmailVerified: user.isEmailVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
+  }
+
+  private mapRoleToDto(role: RoleDocument) {
+    return {
+      id: role._id.toString(),
+      name: role.name,
+      permissions: role.permissions,
+      description: role.description,
+      createdAt: role.createdAt,
+      updatedAt: role.updatedAt
+    };
+  }
+
+  private mapPermissionToDto(permission: PermissionDocument) {
+    return {
+      id: permission._id.toString(),
+      name: permission.name,
+      description: permission.description,
+      createdAt: permission.createdAt,
+      updatedAt: permission.updatedAt
+    };
+  }
+
+  async createAdmin(createAdminDto: CreateAdminDto): Promise<UserDto> {
     const { email, password, roles } = createAdminDto;
 
     // Email kontrolü
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
-      throw new BadRequestException(
-        await this.i18nService.translate('admin.emailExists')
+      throw new ConflictException(
+        await this.i18nService.translate('admin.EMAIL_ALREADY_EXISTS')
       );
     }
 
@@ -33,7 +68,7 @@ export class AdminService {
     const validRoles = await this.roleModel.find({ _id: { $in: roles } });
     if (validRoles.length !== roles.length) {
       throw new BadRequestException(
-        await this.i18nService.translate('admin.invalidRoles')
+        await this.i18nService.translate('admin.INVALID_ROLES')
       );
     }
 
@@ -48,14 +83,15 @@ export class AdminService {
       isAdmin: true,
     });
 
-    return newAdmin.save();
+    const savedAdmin = await newAdmin.save();
+    return this.mapUserToDto(savedAdmin);
   }
 
-  async createRole(name: string, permissions: string[]) {
+  async createRole(name: string, permissions: string[], description?: string) {
     const existingRole = await this.roleModel.findOne({ name });
     if (existingRole) {
-      throw new BadRequestException(
-        await this.i18nService.translate('admin.roleExists')
+      throw new ConflictException(
+        await this.i18nService.translate('admin.ROLE_ALREADY_EXISTS')
       );
     }
 
@@ -65,23 +101,25 @@ export class AdminService {
     });
     if (validPermissions.length !== permissions.length) {
       throw new BadRequestException(
-        await this.i18nService.translate('admin.invalidPermissions')
+        await this.i18nService.translate('admin.INVALID_PERMISSIONS')
       );
     }
 
     const newRole = new this.roleModel({
       name,
       permissions: validPermissions.map(p => p._id),
+      description
     });
 
-    return newRole.save();
+    const savedRole = await newRole.save();
+    return this.mapRoleToDto(savedRole);
   }
 
   async createPermission(name: string, description: string) {
     const existingPermission = await this.permissionModel.findOne({ name });
     if (existingPermission) {
-      throw new BadRequestException(
-        await this.i18nService.translate('admin.permissionExists')
+      throw new ConflictException(
+        await this.i18nService.translate('admin.PERMISSION_ALREADY_EXISTS')
       );
     }
 
@@ -90,6 +128,7 @@ export class AdminService {
       description,
     });
 
-    return newPermission.save();
+    const savedPermission = await newPermission.save();
+    return this.mapPermissionToDto(savedPermission);
   }
 }
