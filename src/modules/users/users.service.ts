@@ -1,165 +1,172 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import {
-    CreateUserDto,
-    UpdateUserDto,
-    UserQueryDto,
-    UserListResponseDto,
-    UserDto
+  CreateUserDto,
+  UpdateUserDto,
+  UserQueryDto,
+  UserListResponseDto,
+  UserDto,
 } from './dto';
 import * as bcrypt from 'bcrypt';
 import { I18nService } from 'nestjs-i18n';
 
 @Injectable()
 export class UsersService {
-    constructor(
-        @InjectModel(User.name) private userModel: Model<UserDocument>,
-        private i18nService: I18nService
-    ) { }
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private i18nService: I18nService,
+  ) {}
 
-    private mapUserToDto(user: UserDocument): UserDto {
-        return {
-            id: user._id.toString(),
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            roles: user.roles?.map(role => typeof role === 'string' ? role : role.name),
-            isEmailVerified: user.isEmailVerified,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt
-        };
+  private mapUserToDto(user: UserDocument): UserDto {
+    return {
+      id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles?.map((role) =>
+        typeof role === 'string' ? role : role.name,
+      ),
+      isEmailVerified: user.isEmailVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+
+  async create(createUserDto: CreateUserDto): Promise<UserDto> {
+    const existingUser = await this.userModel.findOne({
+      email: createUserDto.email,
+    });
+
+    if (existingUser) {
+      throw new ConflictException(
+        await this.i18nService.translate('users.EMAIL_ALREADY_EXISTS'),
+      );
     }
 
-    async create(createUserDto: CreateUserDto): Promise<UserDto> {
-        const existingUser = await this.userModel.findOne({
-            email: createUserDto.email
-        });
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const createdUser = new this.userModel({
+      ...createUserDto,
+      password: hashedPassword,
+      roles: ['user'], // Default role
+    });
 
-        if (existingUser) {
-            throw new ConflictException(
-                await this.i18nService.translate('users.EMAIL_ALREADY_EXISTS')
-            );
+    const savedUser = await createdUser.save();
+    return this.mapUserToDto(savedUser);
+  }
+
+  async findByEmail(email: string): Promise<UserDocument | null> {
+    return await this.userModel
+      .findOne({ email })
+      .populate('roles')
+      .populate('permissions')
+      .exec();
+  }
+
+  async findById(id: string): Promise<UserDto> {
+    const user = await this.userModel
+      .findById(id)
+      .populate('roles')
+      .populate('permissions')
+      .exec();
+
+    if (!user) {
+      throw new NotFoundException(
+        await this.i18nService.translate('users.USER_NOT_FOUND'),
+      );
+    }
+
+    return this.mapUserToDto(user);
+  }
+
+  async findAll(query: UserQueryDto): Promise<UserListResponseDto> {
+    const { page = 1, limit = 10, search } = query;
+
+    const filter = search
+      ? {
+          $or: [
+            { email: { $regex: search, $options: 'i' } },
+            { firstName: { $regex: search, $options: 'i' } },
+            { lastName: { $regex: search, $options: 'i' } },
+          ],
         }
+      : {};
 
-        const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-        const createdUser = new this.userModel({
-            ...createUserDto,
-            password: hashedPassword,
-            roles: ['user']  // Default role
-        });
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .populate('roles')
+        .populate('permissions')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .exec(),
+      this.userModel.countDocuments(filter),
+    ]);
 
-        const savedUser = await createdUser.save();
-        return this.mapUserToDto(savedUser);
+    return {
+      data: users.map((user) => this.mapUserToDto(user)),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<UserDto> {
+    // If password is provided, hash it
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
-    async findByEmail(email: string): Promise<UserDocument | null> {
-        return await this.userModel
-            .findOne({ email })
-            .populate('roles')
-            .populate('permissions')
-            .exec();
+    const user = await this.userModel
+      .findByIdAndUpdate(id, { $set: updateUserDto }, { new: true })
+      .populate('roles')
+      .populate('permissions')
+      .exec();
+
+    if (!user) {
+      throw new NotFoundException(
+        await this.i18nService.translate('users.USER_NOT_FOUND'),
+      );
     }
 
-    async findById(id: string): Promise<UserDto> {
-        const user = await this.userModel
-            .findById(id)
-            .populate('roles')
-            .populate('permissions')
-            .exec();
+    return this.mapUserToDto(user);
+  }
 
-        if (!user) {
-            throw new NotFoundException(
-                await this.i18nService.translate('users.USER_NOT_FOUND')
-            );
-        }
+  async remove(id: string): Promise<UserDto> {
+    const user = await this.userModel
+      .findByIdAndDelete(id)
+      .populate('roles')
+      .populate('permissions')
+      .exec();
 
-        return this.mapUserToDto(user);
+    if (!user) {
+      throw new NotFoundException(
+        await this.i18nService.translate('users.USER_NOT_FOUND'),
+      );
     }
 
-    async findAll(query: UserQueryDto): Promise<UserListResponseDto> {
-        const { page = 1, limit = 10, search } = query;
+    return this.mapUserToDto(user);
+  }
 
-        const filter = search ? {
-            $or: [
-                { email: { $regex: search, $options: 'i' } },
-                { firstName: { $regex: search, $options: 'i' } },
-                { lastName: { $regex: search, $options: 'i' } }
-            ]
-        } : {};
-
-        const [users, total] = await Promise.all([
-            this.userModel
-                .find(filter)
-                .populate('roles')
-                .populate('permissions')
-                .skip((page - 1) * limit)
-                .limit(limit)
-                .sort({ createdAt: -1 })
-                .exec(),
-            this.userModel.countDocuments(filter)
-        ]);
-
-        return {
-            data: users.map(user => this.mapUserToDto(user)),
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
-            }
-        };
-    }
-
-    async update(id: string, updateUserDto: UpdateUserDto): Promise<UserDto> {
-        // If password is provided, hash it
-        if (updateUserDto.password) {
-            updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
-        }
-
-        const user = await this.userModel
-            .findByIdAndUpdate(
-                id,
-                { $set: updateUserDto },
-                { new: true }
-            )
-            .populate('roles')
-            .populate('permissions')
-            .exec();
-
-        if (!user) {
-            throw new NotFoundException(
-                await this.i18nService.translate('users.USER_NOT_FOUND')
-            );
-        }
-
-        return this.mapUserToDto(user);
-    }
-
-    async remove(id: string): Promise<UserDto> {
-        const user = await this.userModel
-            .findByIdAndDelete(id)
-            .populate('roles')
-            .populate('permissions')
-            .exec();
-
-        if (!user) {
-            throw new NotFoundException(
-                await this.i18nService.translate('users.USER_NOT_FOUND')
-            );
-        }
-
-        return this.mapUserToDto(user);
-    }
-
-    async updateRefreshToken(userId: string, refreshToken: string | null): Promise<void> {
-        await this.userModel.updateOne(
-            { _id: userId },
-            {
-                refreshToken: refreshToken ? await bcrypt.hash(refreshToken, 10) : null,
-                lastLoginAt: new Date()
-            }
-        );
-    }
+  async updateRefreshToken(
+    userId: string,
+    refreshToken: string | null,
+  ): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      {
+        refreshToken: refreshToken ? await bcrypt.hash(refreshToken, 10) : null,
+        lastLoginAt: new Date(),
+      },
+    );
+  }
 }
