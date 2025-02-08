@@ -3,7 +3,9 @@ import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { UserDto } from '../../../users/dto/response/user.dto';
 import { Permission } from '../../schemas/permission.schema';
 
-export class SessionResponseDto extends OmitType(UserDto, ['refreshToken'] as const) {
+export class SessionResponseDto extends OmitType(UserDto, [
+  'refreshToken',
+] as const) {
   @ApiProperty({ type: [Permission], example: ['users.read', 'users.write'] })
   permissions: Permission[];
 

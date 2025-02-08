@@ -1,6 +1,17 @@
-// src/modules/users/dto/response/user.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import { Permission } from 'src/modules/auth/schemas/permission.schema';
+
+// Önce phone için ayrı bir DTO oluşturalım
+export class PhoneDto {
+  @ApiProperty({ example: '+90', description: 'Country code with plus sign' })
+  countryCode: string;
+
+  @ApiProperty({
+    example: '5321234567',
+    description: 'Phone number without country code',
+  })
+  number: string;
+}
 
 export class UserDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
@@ -23,6 +34,9 @@ export class UserDto {
 
   @ApiProperty({ example: true })
   isEmailVerified: boolean;
+
+  @ApiProperty({ type: PhoneDto, required: false })
+  phone?: PhoneDto;
 
   @ApiProperty({ example: '2024-02-01T12:00:00.000Z' })
   createdAt: Date;

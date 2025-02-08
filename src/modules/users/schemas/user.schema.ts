@@ -3,10 +3,11 @@ import { Document, Types } from 'mongoose';
 import { Role } from 'src/modules/auth/schemas/role.schema';
 import { Permission } from 'src/modules/auth/schemas/permission.schema';
 
-export type UserDocument = User & Document & {
-  createdAt: Date;
-  updatedAt: Date;
-};
+export type UserDocument = User &
+  Document & {
+    createdAt: Date;
+    updatedAt: Date;
+  };
 
 @Schema({
   timestamps: true,
@@ -33,6 +34,18 @@ export class User {
   @Prop({ required: true, unique: true })
   email: string;
 
+  @Prop({
+    type: {
+      countryCode: { type: String, required: true }, // Ex: "+90"
+      number: { type: String, required: true }, // Ex: "5321234567"
+    },
+    _id: false,
+  })
+  phone?: {
+    countryCode: string;
+    number: string;
+  };
+
   @Prop()
   password?: string;
 
@@ -45,7 +58,10 @@ export class User {
   @Prop({ type: [{ type: Types.ObjectId, ref: Role.name }], default: ['user'] })
   roles: Role[];
 
-  @Prop({ type: [{ type: Types.ObjectId, ref: Permission.name }], default: ['read:profile'] })
+  @Prop({
+    type: [{ type: Types.ObjectId, ref: Permission.name }],
+    default: ['read:profile'],
+  })
   permissions: Permission[];
 
   @Prop()

@@ -24,17 +24,25 @@ export class UsersService {
   ) {}
 
   private mapUserToDto(user: UserDocument): UserDto {
+    const userObject = user.toObject(); // Mongoose dokümanını düz objeye çevir
+
     return {
-      id: user._id.toString(),
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      roles: user.roles?.map((role) =>
+      id: userObject._id.toString(),
+      email: userObject.email,
+      firstName: userObject.firstName,
+      lastName: userObject.lastName,
+      phone: userObject.phone
+        ? {
+            countryCode: userObject.phone.countryCode,
+            number: userObject.phone.number,
+          }
+        : undefined,
+      roles: userObject.roles?.map((role) =>
         typeof role === 'string' ? role : role.name,
       ),
-      isEmailVerified: user.isEmailVerified,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      isEmailVerified: userObject.isEmailVerified,
+      createdAt: userObject.createdAt,
+      updatedAt: userObject.updatedAt,
     };
   }
 
@@ -168,5 +176,22 @@ export class UsersService {
         lastLoginAt: new Date(),
       },
     );
+  }
+
+  async findByIdWithPassword(id: string): Promise<UserDocument> {
+    const user = await this.userModel
+      .findById(id)
+      .select('+password') // Password'ü de getir
+      .populate('roles')
+      .populate('permissions')
+      .exec();
+
+    if (!user) {
+      throw new NotFoundException(
+        await this.i18nService.translate('users.USER_NOT_FOUND'),
+      );
+    }
+
+    return user;
   }
 }
